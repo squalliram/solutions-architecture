@@ -4,7 +4,7 @@ template:
   versionLabel: v1
   type: Pipeline
   projectIdentifier: Global
-  orgIdentifier: IramsDemoFMEOrg
+  orgIdentifier: IramsDemoOrgFME
   description: Automate feature flag removal with this ready-to-use pipeline template. Powered by our AI coding agent, it scans your codebase, removes the feature flags you select, and helps you ship cleaner, leaner code.
   tags:
     feature-flag: ""
