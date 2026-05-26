@@ -263,12 +263,12 @@ template:
                                 return FFMetadata(
                                     data['id'],
                                     data['name'],
-                                    data['description'],
+                                    data.get('description', ''),
                                     IdAndName(**data['trafficType']),
                                     data['creationTime'],
                                     RolloutStatus(**data['rolloutStatus']) if 'rolloutStatus' in data else None,
                                     data.get('rolloutStatusTimestamp'),
-                                    data['tags'],
+                                    data.get('tags', []),
                                 )
 
 
@@ -280,7 +280,7 @@ template:
 
                             @staticmethod
                             def from_dict(data: Dict) -> 'Treatment':
-                                return Treatment(data['name'], data['description'], data.get('keys'))
+                                return Treatment(data['name'], data.get('description', ''), data.get('keys'))
 
                             def to_dict(self) -> Dict:
                                 return {"name": self.name, "description": self.description, "keys": self.keys}
