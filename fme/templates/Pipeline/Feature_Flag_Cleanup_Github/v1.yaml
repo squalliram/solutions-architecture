@@ -675,18 +675,10 @@ template:
                     name: Feature Flag Selector Agent
                     identifier: selector_codeagent
                     spec:
-                      connectorRef: account.harnessImage
+                      connectorRef: Docker_Hub_Connector_FF_Cleanup
                       registryRef: fme-docker
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
-                      envVariables:
-                        TASK_FILE: <+steps.metadata.output.outputVariables.workdir>/task.txt
-                        WORKING_DIRECTORY: /harness
-                        ANTHROPIC_API_KEY: <+pipeline.variables.LLM_AUTH_TOKEN>
-                        MAX_ITERATIONS: 250
-                      volumes:
-                        - name: workspace
-                          mountPath: /harness
                     timeout: 10m
                     failureStrategies:
                       - onFailure:
