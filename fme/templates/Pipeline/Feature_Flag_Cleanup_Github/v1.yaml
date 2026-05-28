@@ -160,7 +160,7 @@ template:
                     identifier: findfossilizedflags
                     spec:
                       shell: Python
-                      command: |
+                      command: |-
                         #!/usr/bin/env python
                         import os
                         import urllib.parse
@@ -539,15 +539,17 @@ template:
 
                                 all_ffs = [ff for env in self._client.list_environments() for ff in self._client.list_flag_definitions(env.id)]
                                 by_name = {}
-                                key=lambda ff: ff.name
+                                key = lambda ff: ff.name
                                 for name, ffs in itertools.groupby(sorted(all_ffs, key=key), key=key):
                                     by_name[name] = list(ffs)
 
-                                fossilized = [
-                                    FossilizedFlag(name, treatment, 'rolled out across all envs')
-                                    for name, defs in by_name.items()
-                                    if (treatment := self.get_fossilized_treatment_for_definitions(defs)) and name not in permanent
-                                ]
+                                # FIX: replaced walrus operator list comprehension with explicit for-loop to
+                                # avoid `treatment` leaking into the enclosing scope via := in Python 3.8+
+                                fossilized = []
+                                for name, defs in by_name.items():
+                                    treatment = self.get_fossilized_treatment_for_definitions(defs)
+                                    if treatment and name not in permanent:
+                                        fossilized.append(FossilizedFlag(name, treatment, 'rolled out across all envs'))
 
                                 if require_fully_rolled_out_status:
                                     # TODO(mredolatti): fetch flag metadata rollout status & filter
@@ -558,7 +560,7 @@ template:
                             def get_all_flags(self) -> Dict[str, List[FFDefinition]]:
                                 all_ffs = [ff for env in self._client.list_environments() for ff in self._client.list_flag_definitions(env.id)]
                                 by_name = {}
-                                key=lambda ff: ff.name
+                                key = lambda ff: ff.name
                                 for name, ffs in itertools.groupby(sorted(all_ffs, key=key), key=key):
                                     by_name[name] = list(ffs)
 
@@ -575,23 +577,23 @@ template:
 
                                 return treatment
 
-
                             @classmethod
                             def get_fossilized_treatment_for_definition(cls, ff: FFDefinition) -> Optional[str]:
                                 treatment = cls.get_fossilized_treatment_for_buckets(ff.default_rule)
                                 if not treatment:
                                     return None
 
-                                # for whitelists with different treatmetns
+                                # FIX: was `t != treatment`, which compared a Treatment object to a str — always
+                                # True, causing any flag with whitelisted keys to be incorrectly excluded.
+                                # FIX: removed redundant `len(t.keys) > 0` — truthiness of t.keys is sufficient.
                                 for t in ff.treatments:
-                                    if t.keys and len(t.keys) > 0 and t != treatment:
+                                    if t.keys and t.name != treatment:
                                         return None
 
                                 if not all(cls.get_fossilized_treatment_for_buckets(rule.buckets) == treatment for rule in ff.rules):
                                     return None
 
                                 return treatment
-
 
                             @classmethod
                             def get_fossilized_treatment_for_buckets(cls, ts: List[Bucket]) -> Optional[str]:
@@ -607,7 +609,7 @@ template:
                             if not apikey or not ws_id:
                                 raise RuntimeError('apikey and ws_id are mandatory')
 
-                            kwargs = {}
+                            # FIX: removed redundant blank `kwargs = {}` that was immediately overwritten
                             base_url = os.getenv('HFRA_FME_BASE_URL')
                             kwargs = {'base_url': base_url} if base_url else {}
                             client = ApiClient(apikey, ws_id, **kwargs)
@@ -617,7 +619,6 @@ template:
 
                             output_dir = os.getenv('HFRA_FFF_OUTPUT_DIR', '.')
                             os.makedirs(output_dir, exist_ok=True)
-
 
                             folders_to_exclude = ['.git']
 
@@ -629,7 +630,6 @@ template:
 
                             to_dump = {}
                             for flag_name, flag in flags.items():
-                                #print(f"Searching for '{flag_name}' in {directory}...")
                                 results = search_string_in_files(
                                     search_string=flag_name,
                                     root_directory=directory,
@@ -641,8 +641,10 @@ template:
                                     if occurrences:
                                         to_dump[flag_name] = [ff.to_dict() for ff in flag]
 
-                            with open(f"{output_dir}/elegible_flags.json", 'w') as f:
+                            # FIX: corrected "elegible" typo to "eligible"
+                            with open(f"{output_dir}/eligible_flags.json", 'w') as f:
                                 json.dump(to_dump, f)
+
 
                         if __name__ == '__main__':
                             main()
