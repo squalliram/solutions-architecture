@@ -844,18 +844,10 @@ template:
                     name: code-agent
                     identifier: codeagent
                     spec:
-                      connectorRef: account.harnessImage
+                      connectorRef: Docker_Hub_Connector_FF_Cleanup
                       registryRef: fme-docker
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
-                      envVariables:
-                        TASK_FILE: <+pipeline.stages.FFCleanupStage.spec.execution.steps.metadata.output.outputVariables.workdir>/task.txt
-                        WORKING_DIRECTORY: /harness
-                        ANTHROPIC_API_KEY: <+pipeline.variables.LLM_AUTH_TOKEN>
-                        MAX_ITERATIONS: 250
-                      volumes:
-                        - name: workspace
-                          mountPath: /harness
                     timeout: 10m
                     failureStrategies:
                       - onFailure:
