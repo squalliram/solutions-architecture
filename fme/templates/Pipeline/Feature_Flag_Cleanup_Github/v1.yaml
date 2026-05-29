@@ -684,8 +684,8 @@ template:
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
                       settings:
-                        task_file: /harness/tempdir/task.txt
-                        working_directory: /harness/tempdir
+                        task_file: <+steps.Generate_Prompt.output.outputVariables.OUTPUT_TASK>
+                        working_directory: <+steps.metadata.output.outputVariables.workdir>
                         max_iterations: "10"
                     timeout: 10m
                     failureStrategies:
