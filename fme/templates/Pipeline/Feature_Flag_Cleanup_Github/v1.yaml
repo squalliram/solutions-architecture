@@ -674,6 +674,9 @@ template:
                           - The output MUST BE a ONLY ONE string comma separated where each feature flag in the string follows this pattern: '{feature_flag_name} (treatment={ff.treatment}; reason={reason})'. Where feature_flag_name is the Feature Flag Name, the treatment is the feature flag treatment and the reason is a very short sentence that explains why the feature flag has been selected.
                             - The output comma separated string must be write in a new file named \`${WORKING_DIR}/filtered_flags.txt\`
                         ENDOFTASK
+
+                        # Export as output variable (only needed if using expressions)
+                        echo "OUTPUT_TASK=${OUTPUT_TASK}" >> $HARNESS_OUTPUT_FILE
                 - step:
                     type: Plugin
                     name: Feature Flag Selector Agent
