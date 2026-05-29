@@ -347,6 +347,7 @@ template:
             caching:
               enabled: true
               override: true
+              paths: []
             platform:
               os: Linux
               arch: Arm64
@@ -549,6 +550,8 @@ template:
                     volumes:
                       - name: workspace
                         mountPath: /harness
+            buildIntelligence:
+              enabled: true
     variables:
       - name: REPO_URL
         type: String
