@@ -161,6 +161,9 @@ template:
                     spec:
                       shell: Python
                       command: |-
+                        import os
+                        import json
+
                         def main():
                             apikey = os.getenv('HFRA_FME_ADMIN_APIKEY')
                             ws_id = os.getenv('HFRA_FME_PROJECT_ID')
