@@ -161,455 +161,12 @@ template:
                     spec:
                       shell: Python
                       command: |-
-                        #!/usr/bin/env python
-                        import os
-                        import urllib.parse
-                        import itertools
-                        import json
-                        import time
-
-                        from dataclasses import dataclass, asdict
-                        from typing import List, Dict, Optional
-
-                        import requests
-
-                        from pathlib import Path
-
-                        def search_string_in_files(
-                                search_string: str,
-                                root_directory: str,
-                                excluded_folders: List[str] = None,
-                                extensions: List[str] = None
-                        ) -> Dict[str, List[Dict[str, any]]]:
-                            """
-                            Search for a string in all files within a directory.
-
-                            Args:
-                                search_string: The string to search for
-                                root_directory: Path to the directory to search in
-                                excluded_folders: List of folder names to exclude (e.g., ['.git', 'node_modules'])
-                                extensions: List of file extensions to include (e.g., ['.py', '.txt']).
-                                          If None, searches in all files.
-
-                            Returns:
-                                Dictionary with the searched string as key and a list of results as value.
-                                Each result contains: file, line, column
-                            """
-                            if excluded_folders is None:
-                                excluded_folders = ['.git']
-
-                            results = {search_string: []}
-                            directory_path = Path(root_directory).resolve()
-
-                            # Walk through all files in the directory
-                            for current_path, folders, files in os.walk(directory_path):
-                                # Filter out excluded folders
-                                folders[:] = [f for f in folders if f not in excluded_folders]
-
-                                for file_name in files:
-                                    full_path = Path(current_path) / file_name
-
-                                    # Filter by extension if specified
-                                    if extensions and full_path.suffix not in extensions:
-                                        continue
-
-                                    try:
-                                        # Try to read the file as text
-                                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as file:
-                                            for line_number, line in enumerate(file, start=1):
-                                                # Search for all occurrences of the string in the line
-                                                column = 0
-                                                while True:
-                                                    position = line.find(search_string, column)
-                                                    if position == -1:
-                                                        break
-
-                                                    # Save the result
-                                                    results[search_string].append({
-                                                        'file': str(full_path),
-                                                        'line': line_number,
-                                                        'column': position + 1  # +1 to make it 1-indexed
-                                                    })
-
-                                                    column = position + 1
-
-                                    except (PermissionError, IsADirectoryError):
-                                        # Ignore files without permission or that are directories
-                                        continue
-                                    except Exception as e:
-                                        # Ignore other errors (binary files, etc.)
-                                        continue
-
-                            return results
-
-
-                        def print_results(results: Dict[str, List[Dict[str, any]]]):
-                            """
-                            Print the results in a readable format.
-                            """
-                            for searched_string, occurrences in results.items():
-                                print(f"\nSearching for: '{searched_string}'")
-                                print(f"Total occurrences found: {len(occurrences)}")
-                                print("-" * 80)
-
-                                if not occurrences:
-                                    print("No results found.")
-                                else:
-                                    for result in occurrences:
-                                        print(f"File: {result['file']}")
-                                        print(f"  Line: {result['line']}, Column: {result['column']}")
-
-
-
-                        @dataclass
-                        class IdAndName:
-                            id: str
-                            name: str
-
-                            def to_dict(self) -> Dict:
-                                return {"id": self.id, "name": self.name}
-
-
-                        @dataclass
-                        class Environment:
-                            id: str
-                            name: str
-                            type: str
-                            production: bool
-
-                            def to_dict(self) -> Dict:
-                                return {"id": self.id, "name": self.name, "type": self.type, "production": self.production}
-
-
-                        @dataclass
-                        class RolloutStatus:
-                            id: str
-                            name: str
-
-                            def to_dict(self) -> Dict:
-                                return {"id": self.id, "name": self.name}
-
-
-                        @dataclass
-                        class FFMetadata:
-                            id: str
-                            name: str
-                            description: str
-                            traffic_type: IdAndName
-                            creation_time: int
-                            rollout_status: Optional[RolloutStatus]
-                            rollout_status_timestamp: Optional[int]
-                            tags: List[str]
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'FFMetadata':
-                                return FFMetadata(
-                                    data['id'],
-                                    data['name'],
-                                    data.get('description', ''),
-                                    IdAndName(**data['trafficType']),
-                                    data['creationTime'],
-                                    RolloutStatus(**data['rolloutStatus']) if 'rolloutStatus' in data else None,
-                                    data.get('rolloutStatusTimestamp'),
-                                    data.get('tags', []),
-                                )
-
-
-                        @dataclass
-                        class Treatment:
-                            name: str
-                            description: str
-                            keys: Optional[List[str]]
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'Treatment':
-                                return Treatment(data['name'], data.get('description', ''), data.get('keys'))
-
-                            def to_dict(self) -> Dict:
-                                return {"name": self.name, "description": self.description, "keys": self.keys}
-
-
-                        @dataclass
-                        class Bucket:
-                            treatment: str
-                            size: int
-
-                            def to_dict(self) -> Dict:
-                                return {"treatment": self.treatment, "size": self.size}
-
-
-                        @dataclass
-                        class Matcher:
-                            type: str
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'Matcher':
-                                return Matcher(data['type'])
-
-                            def to_dict(self) -> Dict:
-                                return {"type": self.type}
-
-
-                        @dataclass
-                        class Condition:
-                            combiner: str
-                            matchers: List[Matcher]
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'Condition':
-                                return Condition(data['combiner'], [Matcher.from_dict(md) for md in data['matchers']])
-
-                            def to_dict(self) -> Dict:
-                                return {"combiner": self.combiner, "matchers": [m.to_dict() for m in self.matchers]}
-
-
-                        @dataclass
-                        class Rule:
-                            buckets: List[Bucket]
-                            condition: Condition
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'Rule':
-                                return Rule([Bucket(**b) for b in data['buckets']], Condition.from_dict(data['condition']))
-
-                            def to_dict(self) -> Dict:
-                                return {"buckets": [b.to_dict() for b in self.buckets], "condition": self.condition.to_dict()}
-
-
-
-                        @dataclass
-                        class FFDefinition:
-                            id: str
-                            name: str
-                            environment: IdAndName
-                            traffic_type: IdAndName
-                            killed: bool
-                            treatments: List[Treatment]
-                            default_treatment: str
-                            baseline_treatment: Optional[str]
-                            traffic_allocation: int
-                            rules: List[Rule]
-                            default_rule: List[Bucket]
-                            creation_time: int
-                            last_update_time: int
-                            change_number: int
-                            impressions_disabled: bool
-                            last_traffic_received_at: int
-
-                            @staticmethod
-                            def from_dict(data: Dict) -> 'FFDefinition':
-                                return FFDefinition(
-                                    data["id"],
-                                    data["name"],
-                                    IdAndName(**data["environment"]),
-                                    IdAndName(**data["trafficType"]),
-                                    data["killed"],
-                                    [Treatment.from_dict(t) for t in data["treatments"]],
-                                    data["defaultTreatment"],
-                                    data.get("baselineTreatment"),
-                                    data["trafficAllocation"],
-                                    [Rule.from_dict(r) for r in data["rules"]],
-                                    [Bucket(**b) for b in data["defaultRule"]],
-                                    data["creationTime"],
-                                    data["lastUpdateTime"],
-                                    data["changeNumber"],
-                                    data["impressionsDisabled"],
-                                    data.get("lastTrafficReceivedAt"),
-                                )
-
-                            def to_dict(self) -> Dict:
-                                return {
-                                    "id": self.id,
-                                    "name": self.name,
-                                    "environment": self.environment.to_dict(),
-                                    "trafficType": self.traffic_type.to_dict(),
-                                    "killed": self.killed,
-                                    "treatments": [treatment.to_dict() for treatment in self.treatments],
-                                    "defaultTreatment": self.default_treatment,
-                                    "baselineTreatment": self.baseline_treatment,
-                                    "trafficAllocation": self.traffic_allocation,
-                                    "rules": [rule.to_dict() for rule in self.rules],
-                                    "defaultRule": [d.to_dict() for d in self.default_rule],
-                                    "creationTime": self.creation_time,
-                                    "lastUpdateTime": self.last_update_time,
-                                    "changeNumber": self.change_number,
-                                    "impressionsDisabled": self.impressions_disabled,
-                                    "lastTrafficReceivedAt": self.last_traffic_received_at
-                                }
-
-
-                        class ApiClient:
-
-                            def __init__(self, apikey: str, wsid: str, **kwargs):
-                                self._apikey = apikey
-                                self._wsid = wsid
-                                self._base_url = kwargs.get("base_url", 'https://api.split.io')
-
-                            def list_environments(self) -> List[Environment]:
-
-                                while True:
-                                    resp = requests.get(
-                                        urllib.parse.urljoin(self._base_url, f"internal/api/v2/environments/ws/{self._wsid}"),
-                                        headers={'Authorization': f"Bearer {self._apikey}"}
-                                    )
-
-                                    if resp.status_code == 429:
-                                        print("[list_environments] Rate limit hit, waiting 10 seconds & retrying")
-                                        time.sleep(10)
-                                        continue
-
-                                    if resp.status_code != 200:
-                                        raise RuntimeError(f"unexpected status code {resp.status_code} when listing environments: {resp.text}")
-
-                                    return [Environment(**props) for props in resp.json()]
-
-                            def list_flag_metadatas(self) -> List[FFMetadata]:
-
-                                mds = []
-                                offset = 0
-                                while True:
-
-                                    resp = requests.get(
-                                        urllib.parse.urljoin(self._base_url, f"/internal/api/v2/splits/ws/{self._wsid}"),
-                                        headers={'Authorization': f"Bearer {self._apikey}"},
-                                        params={'offset': offset, 'limit': 50},
-                                    )
-
-                                    if resp.status_code == 429:
-                                        print("[list_flag_metadatas] Rate limit hit, waiting 10 seconds & retrying")
-                                        time.sleep(10)
-                                        continue
-
-                                    if resp.status_code != 200:
-                                        raise RuntimeError(f"unexpected status code {resp.status_code} when listing FF metadatas: {resp.text}")
-
-                                    body = resp.json()
-                                    mds.extend(FFMetadata.from_dict(props) for props in body['objects'])
-                                    offset = len(mds)
-
-                                    if offset >= body['totalCount']: # using >= in case FFs get deleted while this is iterating
-                                        return mds
-
-                            def list_flag_definitions(self, env_id: str) -> List[FFDefinition]:
-
-                                defs = []
-                                offset = 0
-                                while True:
-                                    resp = requests.get(
-                                        urllib.parse.urljoin(self._base_url,f"/internal/api/v2/splits/ws/{self._wsid}/environments/{env_id}"),
-                                        headers={'Authorization': f"Bearer {self._apikey}"},
-                                        params={'offset': offset, 'limit': 50},
-                                    )
-
-                                    if resp.status_code == 429:
-                                        print("[list_flag_definitions] Rate limit hit, waiting 10 seconds & retrying")
-                                        time.sleep(10)
-                                        continue
-
-                                    if resp.status_code != 200:
-                                        raise RuntimeError(f"unexpected status code {resp.status_code} when listing FF definitions: {resp.text}")
-
-                                    body = resp.json()
-                                    defs.extend(FFDefinition.from_dict(props) for props in body['objects'])
-                                    offset = len(defs)
-
-                                    if offset >= body['totalCount']: # using >= in case FFs get deleted while this is iterating
-                                        return defs
-
-
-                        @dataclass
-                        class FossilizedFlag:
-                            name: str
-                            treatment: str
-                            reason: str
-
-
-                        class FossilizedFlagFinder:
-
-                            def __init__(self, client: ApiClient):
-                                self._client = client
-
-                            def get_fossilized_flags(self, require_fully_rolled_out_status: bool = False) -> List[FossilizedFlag]:
-
-                                mds = self._client.list_flag_metadatas()
-                                permanent = [
-                                    md.name for md in mds
-                                    if md.rollout_status is not None and md.rollout_status.name == 'Permanent'
-                                ]
-
-                                all_ffs = [ff for env in self._client.list_environments() for ff in self._client.list_flag_definitions(env.id)]
-                                by_name = {}
-                                key = lambda ff: ff.name
-                                for name, ffs in itertools.groupby(sorted(all_ffs, key=key), key=key):
-                                    by_name[name] = list(ffs)
-
-                                # FIX: replaced walrus operator list comprehension with explicit for-loop to
-                                # avoid `treatment` leaking into the enclosing scope via := in Python 3.8+
-                                fossilized = []
-                                for name, defs in by_name.items():
-                                    treatment = self.get_fossilized_treatment_for_definitions(defs)
-                                    if treatment and name not in permanent:
-                                        fossilized.append(FossilizedFlag(name, treatment, 'rolled out across all envs'))
-
-                                if require_fully_rolled_out_status:
-                                    # TODO(mredolatti): fetch flag metadata rollout status & filter
-                                    pass
-
-                                return fossilized
-
-                            def get_all_flags(self) -> Dict[str, List[FFDefinition]]:
-                                all_ffs = [ff for env in self._client.list_environments() for ff in self._client.list_flag_definitions(env.id)]
-                                by_name = {}
-                                key = lambda ff: ff.name
-                                for name, ffs in itertools.groupby(sorted(all_ffs, key=key), key=key):
-                                    by_name[name] = list(ffs)
-
-                                return by_name
-
-                            @classmethod
-                            def get_fossilized_treatment_for_definitions(cls, ffs: List[FFDefinition]) -> Optional[str]:
-                                treatment = cls.get_fossilized_treatment_for_definition(ffs[0])
-                                if not treatment:
-                                    return None
-
-                                if not all(cls.get_fossilized_treatment_for_definition(ff) == treatment for ff in ffs):
-                                    return None
-
-                                return treatment
-
-                            @classmethod
-                            def get_fossilized_treatment_for_definition(cls, ff: FFDefinition) -> Optional[str]:
-                                treatment = cls.get_fossilized_treatment_for_buckets(ff.default_rule)
-                                if not treatment:
-                                    return None
-
-                                # FIX: was `t != treatment`, which compared a Treatment object to a str — always
-                                # True, causing any flag with whitelisted keys to be incorrectly excluded.
-                                # FIX: removed redundant `len(t.keys) > 0` — truthiness of t.keys is sufficient.
-                                for t in ff.treatments:
-                                    if t.keys and t.name != treatment:
-                                        return None
-
-                                if not all(cls.get_fossilized_treatment_for_buckets(rule.buckets) == treatment for rule in ff.rules):
-                                    return None
-
-                                return treatment
-
-                            @classmethod
-                            def get_fossilized_treatment_for_buckets(cls, ts: List[Bucket]) -> Optional[str]:
-                                try:
-                                    return next(t for t in ts if t.size == 100).treatment
-                                except StopIteration:
-                                    return None
-
-
                         def main():
                             apikey = os.getenv('HFRA_FME_ADMIN_APIKEY')
                             ws_id = os.getenv('HFRA_FME_PROJECT_ID')
                             if not apikey or not ws_id:
                                 raise RuntimeError('apikey and ws_id are mandatory')
 
-                            # FIX: removed redundant blank `kwargs = {}` that was immediately overwritten
                             base_url = os.getenv('HFRA_FME_BASE_URL')
                             kwargs = {'base_url': base_url} if base_url else {}
                             client = ApiClient(apikey, ws_id, **kwargs)
@@ -621,10 +178,7 @@ template:
                             os.makedirs(output_dir, exist_ok=True)
 
                             folders_to_exclude = ['.git']
-
-                            # File extensions (optional)
-                            # allowed_extensions = ['.py', '.txt', '.md']  # Uncomment to filter
-                            allowed_extensions = None  # None = all files
+                            allowed_extensions = None
 
                             directory = os.getenv('HFRA_REPO_DIR', '.')
 
@@ -641,9 +195,49 @@ template:
                                     if occurrences:
                                         to_dump[flag_name] = [ff.to_dict() for ff in flag]
 
-                            # FIX: corrected "elegible" typo to "eligible"
+                            # Write the JSON data file
                             with open(f"{output_dir}/eligible_flags.json", 'w') as f:
                                 json.dump(to_dump, f)
+
+                            # NEW: Generate the task file for the AI Code Agent
+                            selection_criteria = os.getenv('HFRA_FEATURE_FLAG_SELECTION_CRITERIA', '')
+                            
+                            if to_dump:
+                                flag_list = '\n'.join(
+                                    f"- **{name}**: default treatment is `{to_dump[name][0]['defaultTreatment']}`"
+                                    for name in to_dump.keys()
+                                )
+                            else:
+                                flag_list = "No eligible flags found matching the criteria."
+
+                            task_content = f"""# Feature Flag Cleanup Task
+
+                        ## Selection Criteria
+                        {selection_criteria}
+
+                        ## Objective
+                        Remove the following feature flags from the codebase. For each flag, replace all conditional logic with the winning treatment's code path and remove dead code branches.
+
+                        ## Flags to Remove
+                        {flag_list}
+
+                        ## Instructions
+                        1. For each flag listed above, find all usages in the codebase
+                        2. Identify the winning treatment (shown after each flag name)
+                        3. Replace all conditional checks (e.g., `if flag_enabled:`) with the winning treatment's behavior
+                        4. Remove the losing treatment's code branches entirely
+                        5. Remove flag SDK initialization and import statements where no longer needed
+                        6. Clean up any orphaned comments or documentation referencing the removed flags
+
+                        ## Reference Data
+                        Detailed flag definitions for all environments are available in `{output_dir}/eligible_flags.json`
+                        """
+
+                            with open(f"{output_dir}/task.md", 'w') as f:
+                                f.write(task_content)
+                            
+                            print(f"Generated task file: {output_dir}/task.md")
+                            print(f"Found {len(to_dump)} eligible flags for cleanup")
 
 
                         if __name__ == '__main__':
