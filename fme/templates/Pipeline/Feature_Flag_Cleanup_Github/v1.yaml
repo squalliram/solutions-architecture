@@ -665,7 +665,7 @@ template:
                         SELECTION_CRITERIA="<+pipeline.variables.FEATURE_FLAG_SELECTION_CRITERIA>"
                         WORKING_DIR="<+steps.metadata.output.outputVariables.workdir>"
                         OUTPUT_TASK="${WORKING_DIR}/task.txt"
-                        FFF_OUTPUT="$(cat ${WORKING_DIR}/elegible_flags.json)"
+                        FFF_OUTPUT="$(cat ${WORKING_DIR}/eligible_flags.json)"
 
                         cat > "${OUTPUT_TASK}" << ENDOFTASK
                         Please execute the following steps:
