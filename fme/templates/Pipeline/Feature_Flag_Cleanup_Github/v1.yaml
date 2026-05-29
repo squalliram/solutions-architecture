@@ -686,9 +686,13 @@ template:
                       registryRef: fme-docker
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
+                      envVariables:
+                        TASK_FILE: /harness/tempdir/task.txt
+                        WORKING_DIRECTORY: /harness/tempdir
+                        MAX_ITERATIONS: "10"
                       settings:
-                        task_file: <+steps.Generate_Prompt.output.outputVariables.OUTPUT_TASK>
-                        working_directory: <+steps.metadata.output.outputVariables.workdir>
+                        task_file: /harness/tempdir/task.txt
+                        working_directory: /harness/tempdir
                         max_iterations: "10"
                     timeout: 10m
                     failureStrategies:
