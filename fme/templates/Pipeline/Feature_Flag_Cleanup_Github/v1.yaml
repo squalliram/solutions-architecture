@@ -641,7 +641,7 @@ template:
                                     if occurrences:
                                         to_dump[flag_name] = [ff.to_dict() for ff in flag]
 
-                            with open(f"{output_dir}/elegible_flags.json", 'w') as f:
+                            with open(f"{output_dir}/eligible_flags.json", 'w') as f:
                                 json.dump(to_dump, f)
 
                         if __name__ == '__main__':
