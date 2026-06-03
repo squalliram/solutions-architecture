@@ -718,7 +718,7 @@ template:
                           type: String
                           value: ELEGIBLE_FEATURE_FLAGS
             buildIntelligence:
-              enabled: false
+              enabled: true
       - stage:
           name: Cleanup Feature Flag Approval
           identifier: app
