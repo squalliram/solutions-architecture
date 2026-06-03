@@ -704,7 +704,7 @@ template:
                       shell: Bash
                       command: |-
                         #!/bin/bash
-
+                        export TASK_FILE="${WORK_DIR}/task.txt"
                         export ELEGIBLE_FEATURE_FLAGS=$(cat $WORK_DIR/filtered_flags.txt)
                       envVariables:
                         WORK_DIR: <+steps.metadata.output.outputVariables.workdir>
