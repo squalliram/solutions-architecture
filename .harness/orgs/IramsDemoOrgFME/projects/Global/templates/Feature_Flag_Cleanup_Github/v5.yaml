@@ -865,7 +865,7 @@ template:
                         working_directory: /harness
                         max_iterations: "250"
                       envVariables:
-                        ANTHROPIC_API_KEY: <+stage.variables.LLM_AUTH_TOKEN>
+                        ANTHROPIC_API_KEY: <+pipeline.variables.LLM_AUTH_TOKEN>
                         TASK_FILE: <+pipeline.stages.FFCleanupStage.spec.execution.steps.metadata.output.outputVariables.workdir>/task.txt
                         WORKING_DIRECTORY: /harness
                         MAX_ITERATIONS: 250
