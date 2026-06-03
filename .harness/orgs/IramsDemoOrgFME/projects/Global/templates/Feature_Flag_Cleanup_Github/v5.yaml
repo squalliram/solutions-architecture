@@ -739,7 +739,7 @@ template:
                       isAutoRejectEnabled: false
                       approvers:
                         userGroups:
-                          - _project_all_users
+                          - account._account_all_users
                         minimumCount: 1
                         disallowPipelineExecutor: false
                       approverInputs:
