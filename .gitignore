@@ -38,3 +38,4 @@ rendered/.keep
 *.local
 .terraform.lock.hcl
 internal/terraform/backend.tf
+tempdir
