@@ -970,6 +970,10 @@ template:
                         mountPath: /harness
             buildIntelligence:
               enabled: true
+          strategy:
+            matrix:
+              flag: <+pipeline.stages.app.spec.approval.approverInputs.selectedFlags>
+              maxConcurrency: 1
     variables:
       - name: REPO_URL
         type: String
