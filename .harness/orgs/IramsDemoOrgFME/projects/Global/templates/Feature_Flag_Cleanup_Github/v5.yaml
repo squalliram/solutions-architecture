@@ -972,7 +972,7 @@ template:
               enabled: true
           strategy:
             matrix:
-              flag: <+pipeline.stages.app.spec.execution.steps.HarnessApproval_1.output.approverInputs.FeatureFlags>
+              flag: <+<+pipeline.stages.FFCleanupStage.spec.execution.steps.elegible_feature_flags.output.outputVariables.elegibleFeatureFlags>.split(",")>
               maxConcurrency: 1
     variables:
       - name: REPO_URL
