@@ -970,10 +970,6 @@ template:
                         mountPath: /harness
             buildIntelligence:
               enabled: true
-          strategy:
-            matrix:
-              flag: <+<+pipeline.stages.FFCleanupStage.spec.execution.steps.elegible_feature_flags.output.outputVariables.elegibleFeatureFlags>.split(",")>
-              maxConcurrency: 1
     variables:
       - name: REPO_URL
         type: String
