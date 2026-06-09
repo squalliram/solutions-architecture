@@ -3,8 +3,8 @@ template:
   identifier: Feature_Flag_Cleanup_Github
   versionLabel: v1
   type: Pipeline
-  projectIdentifier: Global
-  orgIdentifier: IramsDemoOrgFME
+  projectIdentifier: Harness_Split
+  orgIdentifier: PROD
   description: Automate feature flag removal with this ready-to-use pipeline template. Powered by our AI coding agent, it scans your codebase, removes the feature flags you select, and helps you ship cleaner, leaner code.
   tags:
     feature-flag: ""
@@ -160,7 +160,7 @@ template:
                     identifier: findfossilizedflags
                     spec:
                       shell: Python
-                      command: |-
+                      command: |
                         #!/usr/bin/env python
                         import os
                         import urllib.parse
@@ -189,7 +189,7 @@ template:
                                 root_directory: Path to the directory to search in
                                 excluded_folders: List of folder names to exclude (e.g., ['.git', 'node_modules'])
                                 extensions: List of file extensions to include (e.g., ['.py', '.txt']).
-                                            If None, searches in all files.
+                                          If None, searches in all files.
 
                             Returns:
                                 Dictionary with the searched string as key and a list of results as value.
@@ -659,7 +659,6 @@ template:
                       shell: Bash
                       command: |-
                         #!/usr/bin/env bash
-                        set -e
 
                         SELECTION_CRITERIA="<+pipeline.variables.FEATURE_FLAG_SELECTION_CRITERIA>"
                         WORKING_DIR="<+steps.metadata.output.outputVariables.workdir>"
@@ -676,14 +675,18 @@ template:
                     name: Feature Flag Selector Agent
                     identifier: selector_codeagent
                     spec:
-                      connectorRef: Docker_Hub_Connector_FF_Cleanup
+                      connectorRef: account.harnessImage
                       registryRef: fme-docker
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
-                      settings:
-                        task_file: <+steps.metadata.output.outputVariables.workdir>/task.txt
-                        working_directory: /harness
-                        max_iterations: "250"
+                      envVariables:
+                        TASK_FILE: <+steps.metadata.output.outputVariables.workdir>/task.txt
+                        WORKING_DIRECTORY: /harness
+                        ANTHROPIC_API_KEY: <+pipeline.variables.LLM_AUTH_TOKEN>
+                        MAX_ITERATIONS: 250
+                      volumes:
+                        - name: workspace
+                          mountPath: /harness
                     timeout: 10m
                     failureStrategies:
                       - onFailure:
@@ -707,10 +710,9 @@ template:
                     spec:
                       shell: Bash
                       command: |-
-                        command: |-
-                                                #!/bin/bash
-                                                export TASK_FILE="${WORK_DIR}/task.txt"
-                                                export ELEGIBLE_FEATURE_FLAGS=$(cat $WORK_DIR/filtered_flags.txt)
+                        #!/bin/bash
+
+                        export ELEGIBLE_FEATURE_FLAGS=$(cat $WORK_DIR/filtered_flags.txt)
                       envVariables:
                         WORK_DIR: <+steps.metadata.output.outputVariables.workdir>
                       outputVariables:
@@ -718,7 +720,7 @@ template:
                           type: String
                           value: ELEGIBLE_FEATURE_FLAGS
             buildIntelligence:
-              enabled: true
+              enabled: false
       - stage:
           name: Cleanup Feature Flag Approval
           identifier: app
@@ -737,7 +739,7 @@ template:
                       isAutoRejectEnabled: false
                       approvers:
                         userGroups:
-                          - account._account_all_users
+                          - _project_all_users
                         minimumCount: 1
                         disallowPipelineExecutor: false
                       approverInputs:
@@ -757,7 +759,6 @@ template:
             caching:
               enabled: true
               override: true
-              paths: []
             platform:
               os: Linux
               arch: Arm64
@@ -851,16 +852,18 @@ template:
                     name: code-agent
                     identifier: codeagent
                     spec:
-                      connectorRef: Docker_Hub_Connector_FF_Cleanup
+                      connectorRef: account.harnessImage
                       registryRef: fme-docker
                       image: harness/ai-code-agent:v1.2.0
                       imagePullPolicy: Always
-                      settings:
-                        task_file: <+steps.metadata.output.outputVariables.workdir>/task.txt
-                        working_directory: /harness
-                        max_iterations: "250"
                       envVariables:
-                        ANTHROPIC_API_KEY: <+stage.variables.LLM_AUTH_TOKEN>
+                        TASK_FILE: <+pipeline.stages.FFCleanupStage.spec.execution.steps.metadata.output.outputVariables.workdir>/task.txt
+                        WORKING_DIRECTORY: /harness
+                        ANTHROPIC_API_KEY: <+pipeline.variables.LLM_AUTH_TOKEN>
+                        MAX_ITERATIONS: 250
+                      volumes:
+                        - name: workspace
+                          mountPath: /harness
                     timeout: 10m
                     failureStrategies:
                       - onFailure:
@@ -960,8 +963,6 @@ template:
                     volumes:
                       - name: workspace
                         mountPath: /harness
-            buildIntelligence:
-              enabled: true
     variables:
       - name: REPO_URL
         type: String
